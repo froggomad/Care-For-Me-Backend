@@ -3,7 +3,7 @@ var admin = require('firebase-admin');
 admin.initializeApp();
 
 exports.onMessageCreate = functions.database
-.ref('/users/{userId}/notifications/{notificationId}')
+.ref('/users/{userId}/notifications/unread/{notificationId}')
 .onCreate((snapshot, context) => {
     
     const message = snapshot.val()
