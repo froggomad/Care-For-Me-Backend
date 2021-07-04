@@ -18,7 +18,7 @@ exports.onMessageCreate = functions.database
         data: {
             date: Date()
         },
-        token: message.token
+        token: message.forUserId
     }
     
     return admin.messaging().send(notification)
@@ -30,12 +30,3 @@ exports.onMessageCreate = functions.database
     })
     
 })
-
-function getUserToken(id) {
-    const ref = admin.database().ref('users/${id}')
-    ref.once('value', (data) => {
-        return data.token    
-    })
-}
-
- 
