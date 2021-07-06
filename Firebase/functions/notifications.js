@@ -28,11 +28,17 @@ exports.onMessageCreate = functions.database
     const forUserId = message.forUserId
     const date = message.date
     
+    console.log('user Id', forUserId)
+    console.log('date', date)
+    
     const token = await getUserToken(forUserId)
     
     if (token == null) {
+	    console.log('nil token')
 		throw new functions.https.HttpsError('unavailable', 'The token is nil, unable to send message')
 	}
+	
+	console.log('got token', token)
     
     const notification = {
         notification: {
@@ -44,7 +50,7 @@ exports.onMessageCreate = functions.database
 	        title: title,
 	        text: text,	        
 	        forUserId: forUserId,
-            date: date
+            date: date.toString()
         },
         token: token
     }
@@ -60,10 +66,10 @@ exports.onMessageCreate = functions.database
 })
 
 async function getUserToken(forUserId) {
-	const db = functions.database
-	const ref = db.ref('/users/${forUserId}')
-	
-	const snapshot = await ref.once('value') 
-	return snapshot.val().token
-	
+	const db = admin.database()
+	const ref = db.ref('/users/' + forUserId)
+	console.log('/users/' + forUserId)
+	const payload = await ref.once('value')
+	const token = payload.val().token
+	return token	
 }
