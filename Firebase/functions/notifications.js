@@ -1,8 +1,11 @@
 const functions = require("firebase-functions");
 var admin = require('firebase-admin');
 admin.initializeApp();
+const db = admin.database();
 
 /*
+Post a Firebase Message when a notification is created
+
 Triggered on notification creation in realtime database
 front end(s) must send:
 
@@ -17,7 +20,7 @@ front end(s) must send:
 - date: String // 
 
 */
-exports.onMessageCreate = functions.database
+exports.onUnreadNotificationCreate = functions.database
 .ref('/users/{userId}/notifications/unread/{notificationId}')
 .onCreate(async (snapshot, context) => {
     
@@ -28,17 +31,11 @@ exports.onMessageCreate = functions.database
     const forUserId = message.forUserId
     const date = message.date
     
-    console.log('user Id', forUserId)
-    console.log('date', date)
-    
     const token = await getUserToken(forUserId)
     
     if (token == null) {
-	    console.log('nil token')
 		throw new functions.https.HttpsError('unavailable', 'The token is nil, unable to send message')
 	}
-	
-	console.log('got token', token)
     
     const notification = {
         notification: {
@@ -46,8 +43,9 @@ exports.onMessageCreate = functions.database
             body: text
         },
         data: {
+            id: snapshot.key,
 	        category: category,
-	        title: title,
+	        title: message.title,
 	        text: text,	        
 	        forUserId: forUserId,
             date: date.toString()
@@ -65,11 +63,23 @@ exports.onMessageCreate = functions.database
     
 })
 
-async function getUserToken(forUserId) {
-	const db = admin.database()
-	const ref = db.ref('/users/' + forUserId)
-	console.log('/users/' + forUserId)
+async function getUserToken(forUserId) {	
+	const ref = db.ref('/users/' + forUserId + '/privateDetails')
 	const payload = await ref.once('value')
 	const token = payload.val().token
 	return token	
 }
+
+/*
+    Delete the unread notification matching this id
+*/
+
+exports.onReadNotificationCreate = functions.database
+.ref('/users/{userId}/notifications/read/{notificationId}')
+.onCreate(async (snapshot, context) => {
+    const val = snapshot.val()
+    const id = snapshot.key
+    const userId = val.forUserId    
+    
+    db.ref(`/users/${userId}/notifications/unread/${id}`).remove()
+})

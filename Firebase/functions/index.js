@@ -1,4 +1,8 @@
 const functions = require("firebase-functions");
 
 const notifications = require('./notifications');
-exports.onMessageCreate = notifications.onMessageCreate
+exports.onUnreadNotificationCreate = notifications.onUnreadNotificationCreate
+exports.onReadNotificationCreate = notifications.onReadNotificationCreate
+
+const linkUsers = require('./linkUsers');
+exports.createJoinCode = linkUsers.generateRandomCode
