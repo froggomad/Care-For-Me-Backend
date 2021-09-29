@@ -5,4 +5,4 @@ exports.onUnreadNotificationCreate = notifications.onUnreadNotificationCreate
 exports.onReadNotificationCreate = notifications.onReadNotificationCreate
 
 const linkUsers = require('./linkUsers');
-exports.createJoinCode = linkUsers.generateRandomCode
+exports.generateCode = linkUsers.generateCode
