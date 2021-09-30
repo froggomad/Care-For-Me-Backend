@@ -5,38 +5,34 @@ const db = admin.database();
 exports.generateCode = functions.https.onCall(async (data, context) => {
     const userId = data.userId;
     const joinCode = data.joinCode;
-    const userType = data.userType;    
-    const joinCodeRef = db.ref(`/joinCodes/${joinCode}`);
+    const userType = data.userType;
     const userRef = db.ref(`/users/${userId}/privateDetails/joinCode`);
+    var joinCodeRef = db.ref(`/joinCodes/${joinCode}`);
 
     const exists = await lookUpCode(joinCode);
-    const snapshot = await joinCodeRef.once("value");
-    if (snapshot.exists()) {
-        var expirationDate = snapshot.val().expiresOn;
-    }
+    let expirationDate = exists.expirationDate
 
     var joinCodeJSON = {
         userId: userId,
         expiresOn: expirationDate
     }
 
-    var userJSON = {
-        expiresOn: expirationDate,
-        code: joinCode
+    var userJSON = {        
+        code: joinCode,
+        expiresOn: expirationDate
     }
 
     userJSON[userType] = userId;
 
-    if (exists) {        
+    if (exists.linkExists) {
 
         if (isExpired(expirationDate)) {
-
+            
             joinCodeRef
-            .remove();
+            .remove();            
 
             const expiresOn = generateExpirationDate();
-            const randomString = Math.random().toString().substr(2, 6);
-
+            const randomString = generateRandomString();
             joinCodeJSON["expiresOn"] = expiresOn;
 
             db.ref(`/joinCodes/${randomString}`)
@@ -44,15 +40,25 @@ exports.generateCode = functions.https.onCall(async (data, context) => {
 
             userJSON[userType] = userId;
             userJSON["code"] = randomString;
+            userJSON["expiresOn"] = expiresOn;
 
             userRef
             .set(userJSON);
+        } else {
+            if (exists.userId !== userId) {      
+                const randomString = generateRandomString();
+                joinCodeRef = db.ref(`/joinCodes/${randomString}`);
+                userJSON["code"] = randomString;
+                userRef.set(userJSON);
+                joinCodeRef.set(joinCodeJSON);
+            }
         }
+
     } else {
         // save new record
         const expiresOn = generateExpirationDate()
         joinCodeJSON["expiresOn"] = expiresOn;
-        
+
         joinCodeRef
         .set(joinCodeJSON);
 
@@ -61,17 +67,25 @@ exports.generateCode = functions.https.onCall(async (data, context) => {
         userRef
         .set(userJSON);
     }
-    return joinCodeJSON;
+
+    return userJSON;
 })
 
 async function lookUpCode(joinCode) {
-    const snapshot = await db.ref(`/joinCodes/${joinCode}`).once("value");    
-    if (snapshot.exists()) {
-        return true;
-    } else {
-        return false;
-    }
-    
+    const snapshot = await db.ref(`/joinCodes/${joinCode}`).once("value");
+    if (snapshot.exists()) {        
+        return {
+            userId: snapshot.val().userId,
+            expirationDate: snapshot.val().expiresOn,
+            linkExists: true
+        }
+    } else {        
+        return {
+            userId: null,
+            expirationDate: null,
+            linkExists: false
+        }
+    }    
 }
 
 function isExpired(expirationDate) {
@@ -88,4 +102,8 @@ function generateExpirationDate() {
     const dayInMs = 86400000 // 24 hours
 
     return new Date(today.getTime() + (dayInMs * 7)).toJSON();
+}
+
+function generateRandomString() {
+    return Math.random().toString().substr(2, 6);
 }
