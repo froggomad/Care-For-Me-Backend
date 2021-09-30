@@ -61,7 +61,6 @@ exports.generateCode = functions.https.onCall(async (data, context) => {
         userRef
         .set(userJSON);
     }
-    functions.logger.log(joinCodeJSON["expiresOn"]);
     return joinCodeJSON;
 })
 
