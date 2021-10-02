@@ -71,6 +71,7 @@ exports.generateCode = functions.https.onCall(async (data, context) => {
     return userJSON;
 })
 
+
 async function lookUpCode(joinCode) {
     const snapshot = await db.ref(`/joinCodes/${joinCode}`).once("value");
     if (snapshot.exists()) {        
@@ -87,6 +88,41 @@ async function lookUpCode(joinCode) {
         }
     }    
 }
+
+exports.linkRequest = functions.https.onCall(async (data, context) => {
+    const userId = data.userId;
+    const joinCode = data.joinCode;
+
+    var joinCodeRef = db.ref(`/joinCodes/${joinCode}`);
+    const exists = await lookUpCode(joinCode);
+    let expirationDate = exists.expirationDate;
+    if (!exists.linkExists) { 
+        // notify user that's an invalid joinCode
+        return 
+    }
+
+    if (isExpired(expirationDate)) {
+        // notify user that the person they're joining needs to provide a new link code
+        return
+    }
+
+    // notify user owning joinCode that this user would like to join
+    const username = await db.ref(`/users/${userId}/publicDetails/displayName`).once("value")
+    functions.logger.log("retrieved other user's username:" + username);
+    const notificationRef = db.ref(`/users/${exists.userId}/notifications/unread`);
+    const notificationJSON = {
+        "category": "join request",
+        "date": new Date(Date.now()),
+        "forUserId": exists.userId,
+        "text": `${username} would like to securely link their account with yours`,
+        "title": `From ${username}`
+    }
+
+    const notification = await notificationRef.push(notificationJSON);
+    const id = notification.key;
+    // WARNING: this may not work since firebase is pushing a notification as soon as the notificationRef creates a new record (race condition/timing)
+    notificationRef.set({"id": id});
+})
 
 function isExpired(expirationDate) {
     const date = +new Date(expirationDate);
