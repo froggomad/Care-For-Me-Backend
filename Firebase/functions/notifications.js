@@ -1,4 +1,5 @@
 const functions = require("firebase-functions");
+const { v4: uuidv4 } = require('uuid');
 var admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.database();
@@ -83,3 +84,28 @@ exports.onReadNotificationCreate = functions.database
     
     db.ref(`/users/${userId}/notifications/unread/${id}`).remove()
 })
+/**
+ * Sets the necessary JSON at the user's unread notifications ref in
+ * order to trigger a push notification
+ * @returns the JSON that was set at the user's unread notifications ref
+ */
+exports.createPushNotification = ({userId: forUserId, category: forCategory, text: forText, title: forTitle}) => {
+    const notificationId = uuidv4().toUpperCase();
+    const ref = db.ref(`/users/${forUserId}/notifications/unread/${notificationId}`)
+    const notificationJSON = {
+        "id": notificationId,
+        "category": forCategory,
+        "date": nowDate(),
+        "forUserId": forUserId,
+        "text": forText,
+        "title": forTitle
+    }
+    ref.set(notificationJSON);
+    return notificationJSON;
+}
+
+function nowDate() {
+    const now = new Date()  
+    const utcMilllisecondsSinceEpoch = now.getTime() + (now.getTimezoneOffset() * 60 * 1000)  
+    return Math.round(utcMilllisecondsSinceEpoch / 1000);
+}
