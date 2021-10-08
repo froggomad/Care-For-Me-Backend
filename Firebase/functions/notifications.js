@@ -4,23 +4,15 @@ var admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.database();
 
-/*
-Post a Firebase Message when a notification is created
-
-Triggered on notification creation in realtime database
-front end(s) must send:
-
-- category: String // will be concat with `title` (category: title)
-
-- title: String // will be concat with `category` (category: title)
-
-- text: String // the body of the message
-
-- forUserId: String // the user's ID the message is being sent to
-
-- date: String // 
-
-*/
+/**
+ * Post a Firebase Message when a notification is created
+ * Triggered on notification creation in realtime database
+ * @param {string} category - will be concat with `title` (category: title)
+ * @param {string} title - will be concat with `category` (category: title)
+ * @param {string} text - the body of the message
+ * @param {string} forUserId - the user's ID the message is being sent to
+ * @param {string} date - the date the notification was created
+ */
 exports.onUnreadNotificationCreate = functions.database
 .ref('/users/{userId}/notifications/unread/{notificationId}')
 .onCreate(async (snapshot, context) => {
@@ -64,17 +56,9 @@ exports.onUnreadNotificationCreate = functions.database
     
 })
 
-async function getUserToken(forUserId) {	
-	const ref = db.ref('/users/' + forUserId + '/privateDetails')
-	const payload = await ref.once('value')
-	const token = payload.val().token
-	return token	
-}
-
-/*
+/**
     Delete the unread notification matching this id
 */
-
 exports.onReadNotificationCreate = functions.database
 .ref('/users/{userId}/notifications/read/{notificationId}')
 .onCreate(async (snapshot, context) => {
@@ -102,6 +86,13 @@ exports.createPushNotification = ({userId: forUserId, category: forCategory, tex
     }
     ref.set(notificationJSON);
     return notificationJSON;
+}
+// MARK: Helpers
+async function getUserToken(forUserId) {	
+	const ref = db.ref('/users/' + forUserId + '/privateDetails')
+	const payload = await ref.once('value')
+	const token = payload.val().token
+	return token	
 }
 
 function nowDate() {
