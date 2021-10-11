@@ -76,9 +76,7 @@ exports.generateCode = functions.https.onCall(async (data, context) => {
 exports.linkRequest = functions.https.onCall(async (data, context) => {
     const userId = data.userId;
     const joinCode = data.joinCode;
-    const userType = data.userType;
 
-    var joinCodeRef = db.ref(`/joinCodes/${joinCode}`);
     const exists = await lookUpCode(joinCode);
     let expirationDate = exists.expirationDate;    
     if (!exists.linkExists || isExpired(expirationDate)) { 
@@ -87,16 +85,16 @@ exports.linkRequest = functions.https.onCall(async (data, context) => {
     }
 
     // notify user owning joinCode that this user would like to join
-    const usernameRef = db.ref(`/users/${userId}/publicDetails/displayName`)
-    const usernameSnapshot = await usernameRef.once("value");
-    const username = usernameSnapshot.val()
+    const requestingUsername = await getUsername(userId);    
+    notifications.createPushNotification({userId: exists.userId, category: "Join Request", text: `${requestingUsername} would like to securely link their account with yours`, title: `From ${requestingUsername}`});
     
-    notifications.createPushNotification({userId: userId, category: "Join Request", text: `${username} would like to securely link their account with yours`, title: `From ${username}`});
+    // set join request for each user    
+    const requestingUserType = await getUserType(userId);
+    setJoinRequest({userId: exists.userId, otherUserId: userId, userType: requestingUserType, joinCode: joinCode, username: requestingUsername});
     
-    const owningUserType = getOtherUserType(userType);
-    setJoinRequest({userId: exists.userId, userType: owningUserType, joinCode: joinCode});
-    
-    setJoinRequest({userId: userId, userType: userType, joinCode: joinCode});
+    const owningUsername = await getUsername(exists.userId);
+    const owningUserType = await getUserType(exists.userId);
+    setJoinRequest({userId: userId, otherUserId: exists.userId, userType: owningUserType, joinCode: joinCode, username: owningUsername});
 
     return true;
 })
@@ -121,7 +119,7 @@ exports.acceptLinkRequest = functions.https.onCall(async (data, context) => {
     }
 
     let ownerLinkJSON = {
-        "code": joinCode        
+        code: joinCode        
     }
     ownerLinkJSON[requestingUserType] = requestingUserId;
 
@@ -129,9 +127,9 @@ exports.acceptLinkRequest = functions.https.onCall(async (data, context) => {
     
     const requesterJoinCodeLookupRef = db.ref(`/users/${requestingUserId}/privateDetails/joinCode`);
     let requesterLinkJSON = {
-        "code": joinCode
+        code: joinCode
     }
-    const owningUserType = getOtherUserType(requestingUserType)
+    const owningUserType = await getUserType(requestingUserId)
     requesterLinkJSON[owningUserType] = owningUserId;
     requesterJoinCodeLookupRef.update(requesterLinkJSON);
 
@@ -148,9 +146,9 @@ exports.acceptLinkRequest = functions.https.onCall(async (data, context) => {
     notifications.createPushNotification({userId: owningUserId, category: "Join Request", text: `request to link account with ${requestingUserName} accepted`, title: `Join Request Accepted`});    
 
     const returnJSON = {
-        "code": joinCode,
-        "requestingUserType": requestingUserType,
-        "requestingUserId": requestingUserId
+        code: joinCode,
+        requestingUserType: requestingUserType,
+        requestingUserId: requestingUserId
     }
 
     return returnJSON;
@@ -196,23 +194,28 @@ function generateRandomString() {
 
 async function lookupJoinRequest(requestingId, owningId) {
     const ref = db.ref(`/users/${owningId}/joinRequests/${requestingId}`);
-    const snapshot = await snapshot.once("value");
+    const snapshot = await ref.once("value");
     return snapshot.val();
 }
 
-function getOtherUserType(userType) {
-    if (userType === "client") {
-        return "caregiver"
-    } else {
-        return "client"
-    }
+async function getUserType(userId) {
+    const userRef = db.ref(`/users/${userId}/publicDetails/userType`)
+    const snapshot = await userRef.once("value");
+    return snapshot.val();
 }
 
-function setJoinRequest({userId: forUserId, userType: forUserType, joinCode: forJoinCode}) {
+function setJoinRequest({userId: forUserId, otherUserId: forOtherUserId, userType: forUserType, joinCode: forJoinCode, username: forUsername}) {    
     const joinRequestsRef = db.ref(`/users/${forUserId}/privateDetails/joinRequests/${forJoinCode}`);
     const joinRequestJSON = {
-        "userId": forUserId,
-        "userType": forUserType
+        userId: forOtherUserId,
+        username: forUsername,
+        userType: forUserType,
     }
     joinRequestsRef.set(joinRequestJSON);
+}
+
+async function getUsername(fromUserId) {
+    const usernameRef = db.ref(`/users/${fromUserId}/publicDetails/displayName`);
+    const user = await usernameRef.once("value");
+    return user.val();
 }
