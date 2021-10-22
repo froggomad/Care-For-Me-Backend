@@ -79,8 +79,7 @@ exports.linkRequest = functions.https.onCall(async (data, context) => {
 
     const exists = await lookUpCode(joinCode);
     let expirationDate = exists.expirationDate;    
-    if (!exists.linkExists || isExpired(expirationDate)) { 
-        // TODO notify user that's an invalid joinCode
+    if (!exists.linkExists || isExpired(expirationDate)) {
         return false
     }
 
@@ -90,11 +89,7 @@ exports.linkRequest = functions.https.onCall(async (data, context) => {
     
     // set join request for each user    
     const requestingUserType = await getUserType(userId);
-    setJoinRequest({userId: exists.userId, otherUserId: userId, userType: requestingUserType, joinCode: joinCode, username: requestingUsername});
-    
-    const owningUsername = await getUsername(exists.userId);
-    const owningUserType = await getUserType(exists.userId);
-    setJoinRequest({userId: userId, otherUserId: exists.userId, userType: owningUserType, joinCode: joinCode, username: owningUsername});
+    setJoinRequest({userId: exists.userId, otherUserId: userId, userType: requestingUserType, joinCode: joinCode, username: requestingUsername});    
 
     return true;
 })
