@@ -158,6 +158,19 @@ exports.acceptLinkRequest = functions.https.onCall(async (data, context) => {
     return returnJSON;
 })
 
+exports.removeJoinRequest = functions.https.onCall(async (data, context) => {
+    const userId = data.userId;
+    const code = data.requestId;
+    const ref = db.ref(`/users/${userId}/privateDetails/joinRequests/${code}`);
+    const snapshot = await ref.once("value");
+    const exists = snapshot.exists();
+    if (exists) {
+        ref.remove();
+    }
+    functions.logger.log(`join request exists: ${exists}, ref: ${ref.toString()}`)
+    return exists;
+})
+
 // MARK: Helpers
 async function lookUpCode(joinCode) {
     const snapshot = await db.ref(`/joinCodes/${joinCode}`).once("value");
