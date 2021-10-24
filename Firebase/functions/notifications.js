@@ -87,12 +87,13 @@ exports.createPushNotification = ({userId: forUserId, category: forCategory, tex
     ref.set(notificationJSON);
     return notificationJSON;
 }
+
 // MARK: Helpers
 async function getUserToken(forUserId) {	
 	const ref = db.ref('/users/' + forUserId + '/privateDetails')
 	const payload = await ref.once('value')
 	const token = payload.val().token
-	return token	
+	return token
 }
 
 function nowDate() {

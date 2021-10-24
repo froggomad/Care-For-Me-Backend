@@ -95,58 +95,80 @@ exports.linkRequest = functions.https.onCall(async (data, context) => {
 })
 
 exports.acceptLinkRequest = functions.https.onCall(async (data, context) => {
-    const requestingUserId = data.requestingUserId;
-    const requestingUserType = data.requestingUserType;
+    const userId = data.userId;
+    const userType = data.userType;
     const joinCode = data.joinCode;
 
-    var joinCodeRef = db.ref(`/users/${requestingUserId}/privateDetails/joinRequests/${joinCode}`);
-    const joinCodeVal = await joinCodeRef.once("value");
-    const owningUserId = joinCodeVal.val().userId;
-
-    const ownerJoinCodeLookupRef = db.ref(`/users/${owningUserId}/privateDetails/joinCode`);
-    const joinCodeJSON = await ownerJoinCodeLookupRef.once("value")
-    const retrievedCode = joinCodeJSON.val().code;
-
-    if (retrievedCode != joinCode) { 
-        joinCodeJSON["accepted"] = false
-        joinCodeJSON["code"] = nil
-        return joinCodeJSON 
+    const ownerJoinCodeLookupRef = db.ref(`/users/${userId}/privateDetails/joinCode`);
+    const ownerJoinCodeSnapshot = await ownerJoinCodeLookupRef.once("value");
+    const client = ownerJoinCodeSnapshot.val().client;
+    const caregiver = ownerJoinCodeSnapshot.val().client;
+    // make sure user isn't already linked to another user
+    if (client != null && client != undefined && caregiver != null && caregiver != undefined) {
+        return null;
     }
 
+    // verify join code
+    const joinRequestLookupRef = db.ref(`/users/${userId}/privateDetails/joinRequests/${joinCode}`);
+    const joinRequestJSON = await joinRequestLookupRef.once("value")
+    const retrievedCode = joinRequestJSON.key;
+
+    if (retrievedCode != joinCode) {
+        return null;
+    }
+    // lookup requesting user
+    const requestingUserType = joinRequestJSON.val().userType;    
+    const requestingUserId = joinRequestJSON.val().userId;
+
+    // set owner's JSON using requesting user's details
     let ownerLinkJSON = {
         code: joinCode        
     }
     ownerLinkJSON[requestingUserType] = requestingUserId;
-
     ownerJoinCodeLookupRef.update(ownerLinkJSON);
     
     const requesterJoinCodeLookupRef = db.ref(`/users/${requestingUserId}/privateDetails/joinCode`);
+
     let requesterLinkJSON = {
         code: joinCode
     }
-    const owningUserType = await getUserType(requestingUserId)
-    requesterLinkJSON[owningUserType] = owningUserId;
+    requesterLinkJSON[userType] = userId;
     requesterJoinCodeLookupRef.update(requesterLinkJSON);
 
-    const owningUsernameRef = db.ref(`/users/${owningUserId}/publicDetails/displayName`);
+    const owningUsernameRef = db.ref(`/users/${userId}/publicDetails/displayName`);
     const owningUser = await owningUsernameRef.once("value");
     const owningUserName = owningUser.val();
 
     notifications.createPushNotification({userId: requestingUserId, category: "Join Request", text: `${owningUserName} accepted your join request`, title: `Join Request Accepted`});
     
-    const requestingUsernameRef = db.ref(`/users/${requestingUserId}/publicDetails/displayName`);
-    const requestingUser = await requestingUsernameRef.once("value");
-    const requestingUserName = requestingUser.val();
+    // const requestingUsernameRef = db.ref(`/users/${requestingUserId}/publicDetails/displayName`);
+    // const requestingUser = await requestingUsernameRef.once("value");
+    const requestingUserName = joinRequestJSON.val().username;
 
-    notifications.createPushNotification({userId: owningUserId, category: "Join Request", text: `request to link account with ${requestingUserName} accepted`, title: `Join Request Accepted`});    
+    notifications.createPushNotification({userId: userId, category: "Join Request", text: `request to link account with ${requestingUserName} accepted`, title: `Join Request Accepted`});    
+
+    joinRequestLookupRef.remove();
 
     const returnJSON = {
         code: joinCode,
-        requestingUserType: requestingUserType,
-        requestingUserId: requestingUserId
+        requestingUserType: userType,
+        requestingUserId: userId
     }
 
     return returnJSON;
+})
+
+exports.removeJoinRequest = functions.https.onCall(async (data, context) => {
+    const userId = data.userId;
+    const code = data.requestId;
+    const ref = db.ref(`/users/${userId}/privateDetails/joinRequests/${code}`);
+    const snapshot = await ref.once("value");
+    const exists = snapshot.exists();
+    if (exists) {
+        ref.remove();
+    }
+    functions.logger.log(`join request exists: ${exists}, ref: ${ref.toString()}`)
+    return exists;
 })
 
 // MARK: Helpers

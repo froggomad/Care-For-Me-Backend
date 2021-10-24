@@ -8,3 +8,4 @@ const linkUsers = require('./linkUsers');
 exports.generateCode = linkUsers.generateCode
 exports.linkRequest = linkUsers.linkRequest
 exports.acceptLinkRequest = linkUsers.acceptLinkRequest
+exports.removeJoinRequest = linkUsers.removeJoinRequest;
